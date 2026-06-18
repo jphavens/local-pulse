@@ -6,15 +6,14 @@ services:
     ports:
       - "8765:8765"
     environment:
-      # Your Anthropic API key
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      # ntfy topic for phone notifications (your existing topic)
-      - NTFY_TOPIC=Wayland_Pulse_Havens_24
-      # Your homelab server's local IP — used in the ntfy click URL
-      - SERVER_IP=192.168.4.45
+      # Gmail address to send from (must match the app password account)
+      - EMAIL_FROM=${EMAIL_FROM}
+      # Gmail App Password (generate at myaccount.google.com/apppasswords)
+      - EMAIL_PASSWORD=${EMAIL_PASSWORD}
+      # Recipient — defaults to havens.jeremy@gmail.com if not set
+      - EMAIL_TO=${EMAIL_TO:-havens.jeremy@gmail.com}
       # Cron schedule (default: 7am daily). Uses standard cron syntax.
-      # Examples:  0 7 * * *   = 7:00am daily
-      #            30 6 * * *  = 6:30am daily
       - TZ=America/Detroit
       - FETCH_CRON=0 7 * * *
     volumes:

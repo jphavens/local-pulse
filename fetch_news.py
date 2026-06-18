@@ -1,23 +1,30 @@
 """
 Local Pulse - fetch_news.py
 Pulls RSS feeds for Wayland/GR/West MI/Michigan,
-sends to Claude API for summarization, saves news.json.
+sends to Claude API for summarization, saves news.json,
+then emails the digest to EMAIL_TO.
 """
 
 import json
 import os
+import smtplib
+import ssl
 import sys
 import time
 import urllib.request
 import urllib.error
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
 from pathlib import Path
 
 # ── CONFIG ────────────────────────────────────────────────────────────────────
 
-# Your Anthropic API key — set as environment variable OR paste directly here
-API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+API_KEY        = os.environ.get("ANTHROPIC_API_KEY", "")
+EMAIL_FROM     = os.environ.get("EMAIL_FROM", "")
+EMAIL_PASSWORD = os.environ.get("EMAIL_PASSWORD", "")
+EMAIL_TO       = os.environ.get("EMAIL_TO", "havens.jeremy@gmail.com")
 
 # Output goes to /app/data if it exists (Docker), otherwise script dir (local)
 SCRIPT_DIR = Path(__file__).parent
@@ -311,6 +318,148 @@ def call_claude(prompt):
         sys.exit(1)
 
 
+# ── EMAIL ─────────────────────────────────────────────────────────────────────
+
+def format_email_html(news_data):
+    today = datetime.now().strftime("%A, %B %d, %Y")
+
+    section_labels = {
+        "wayland":      "📍 Wayland / Allegan &amp; Barry County",
+        "grand_rapids": "🏙️ Grand Rapids",
+        "west_mi":      "🌊 West Michigan",
+        "michigan":     "🗺️ Michigan Statewide",
+    }
+
+    stories_html = ""
+    for key, label in section_labels.items():
+        stories = news_data.get(key, [])
+        if not stories:
+            continue
+
+        stories_html += f"""
+        <tr><td style="padding:24px 0 8px;">
+          <h2 style="margin:0;font-size:16px;font-weight:700;color:#1a1a2e;
+                     border-bottom:2px solid #e8e8f0;padding-bottom:8px;">{label}</h2>
+        </td></tr>"""
+
+        for story in stories:
+            headline    = story.get("headline", "")
+            summary     = story.get("summary", "")
+            source_name = story.get("source_name", "")
+            source_url  = story.get("source_url", "")
+            event_date  = story.get("event_date")
+            event_loc   = story.get("event_location")
+
+            event_badge = ""
+            if event_date:
+                try:
+                    dt = datetime.fromisoformat(event_date)
+                    event_badge = (
+                        f'<span style="display:inline-block;background:#fff3cd;'
+                        f'color:#856404;font-size:11px;font-weight:600;'
+                        f'padding:2px 8px;border-radius:10px;margin-left:8px;">'
+                        f'📅 {dt.strftime("%-m/%-d %-I:%M %p")}'
+                        f'{"  📌 " + event_loc if event_loc else ""}</span>'
+                    )
+                except ValueError:
+                    pass
+
+            link_open  = f'<a href="{source_url}" style="color:#1a1a2e;text-decoration:none;">' if source_url else ""
+            link_close = "</a>" if source_url else ""
+            read_more  = (
+                f'  <a href="{source_url}" style="color:#4a6cf7;font-size:12px;'
+                f'text-decoration:none;white-space:nowrap;">Read more →</a>'
+            ) if source_url else ""
+
+            stories_html += f"""
+        <tr><td style="padding:12px 0;border-bottom:1px solid #f0f0f5;">
+          <p style="margin:0 0 4px;">
+            {link_open}<strong style="font-size:14px;color:#1a1a2e;">{headline}</strong>{link_close}
+            {event_badge}
+          </p>
+          <p style="margin:0 0 4px;font-size:13px;color:#444;line-height:1.5;">
+            {summary} {read_more}
+          </p>
+          <p style="margin:0;font-size:11px;color:#999;">{source_name}</p>
+        </td></tr>"""
+
+    fetched_at = news_data.get("fetched_at", "")
+    try:
+        fetched_dt = datetime.fromisoformat(fetched_at).astimezone().strftime("%-I:%M %p")
+    except Exception:
+        fetched_dt = fetched_at
+
+    return f"""<!DOCTYPE html>
+<html><head><meta charset="utf-8"></head>
+<body style="margin:0;padding:0;background:#f5f5fa;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f5fa;padding:24px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0"
+             style="background:#fff;border-radius:12px;overflow:hidden;
+                    box-shadow:0 2px 8px rgba(0,0,0,0.08);">
+
+        <!-- header -->
+        <tr><td style="background:linear-gradient(135deg,#1a1a2e,#4a6cf7);
+                       padding:28px 32px;">
+          <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;">
+            📰 Local Pulse
+          </h1>
+          <p style="margin:6px 0 0;color:rgba(255,255,255,0.8);font-size:13px;">
+            {today} &nbsp;·&nbsp; fetched at {fetched_dt}
+          </p>
+        </td></tr>
+
+        <!-- stories -->
+        <tr><td style="padding:8px 32px 24px;">
+          <table width="100%" cellpadding="0" cellspacing="0">
+            {stories_html}
+          </table>
+        </td></tr>
+
+        <!-- footer -->
+        <tr><td style="background:#f5f5fa;padding:16px 32px;
+                       border-top:1px solid #e8e8f0;">
+          <p style="margin:0;font-size:11px;color:#aaa;text-align:center;">
+            Local Pulse · Wayland, MI &nbsp;·&nbsp;
+            Powered by Claude Haiku
+          </p>
+        </td></tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body></html>"""
+
+
+def send_email(news_data):
+    if not EMAIL_FROM or not EMAIL_PASSWORD:
+        log("WARNING: EMAIL_FROM or EMAIL_PASSWORD not set — skipping email")
+        return
+
+    today = datetime.now().strftime("%A, %B %d")
+    subject = f"📰 Local Pulse — {today}"
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = EMAIL_FROM
+    msg["To"]      = EMAIL_TO
+
+    html = format_email_html(news_data)
+    msg.attach(MIMEText(html, "html"))
+
+    log(f"Sending digest email to {EMAIL_TO}...")
+    try:
+        ctx = ssl.create_default_context()
+        with smtplib.SMTP("smtp.gmail.com", 587) as server:
+            server.ehlo()
+            server.starttls(context=ctx)
+            server.login(EMAIL_FROM, EMAIL_PASSWORD)
+            server.sendmail(EMAIL_FROM, EMAIL_TO, msg.as_string())
+        log("✓ Email sent")
+    except Exception as e:
+        log(f"ERROR sending email: {type(e).__name__}: {e}")
+
+
 # ── MAIN ──────────────────────────────────────────────────────────────────────
 
 def main():
@@ -340,6 +489,9 @@ def main():
         json.dump(news_data, f, ensure_ascii=False, indent=2)
 
     log(f"✓ Saved to {OUTPUT_FILE}")
+
+    send_email(news_data)
+
     log("Local Pulse fetch complete")
     log("=" * 60)
 

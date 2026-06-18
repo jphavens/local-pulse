@@ -8,7 +8,7 @@ ln -sf /app/data/fetch.log /app/fetch.log 2>/dev/null || true
 
 echo "[entrypoint] Starting Local Pulse..."
 echo "[entrypoint] Cron schedule: ${FETCH_CRON:-0 7 * * *}"
-echo "[entrypoint] ntfy topic: ${NTFY_TOPIC:-not set}"
+echo "[entrypoint] Email to: ${EMAIL_TO:-havens.jeremy@gmail.com}"
 
 # Update crontab with the configured schedule
 echo "${FETCH_CRON:-0 7 * * *} /app/run_fetch.sh >> /app/data/cron.log 2>&1" > /tmp/crontab
