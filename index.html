@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Local Pulse">
+<title>Local Pulse · Wayland, MI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700;900&family=Source+Serif+4:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #1a1209;
+    --paper: #f7f3ec;
+    --paper-dark: #ede8df;
+    --rule: #c8b99a;
+    --accent: #8b1a1a;
+    --muted: #7a6e60;
+    --event: #1a5c8b;
+    --fresh: #2d6a2d;
+    --font-head: 'Playfair Display', Georgia, serif;
+    --font-body: 'Source Serif 4', Georgia, serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* MASTHEAD */
+  .masthead {
+    background: var(--ink);
+    color: var(--paper);
+    text-align: center;
+    padding: 18px 16px 14px;
+    border-bottom: 4px double var(--rule);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .masthead-title {
+    font-family: var(--font-head);
+    font-size: clamp(1.6rem, 6vw, 2.4rem);
+    font-weight: 900;
+    letter-spacing: 0.05em;
+    line-height: 1;
+    margin-bottom: 4px;
+  }
+  .masthead-meta {
+    font-size: 0.72rem;
+    font-weight: 300;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    opacity: 0.7;
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+
+  /* TOOLBAR */
+  .toolbar {
+    background: var(--paper-dark);
+    border-bottom: 1px solid var(--rule);
+    padding: 8px 16px;
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    font-family: var(--font-head);
+    font-size: 0.85rem;
+    font-weight: 700;
+    padding: 7px 16px;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+    transition: opacity 0.15s;
+    flex-shrink: 0;
+    text-decoration: none;
+    display: inline-block;
+  }
+  .btn:hover { opacity: 0.85; }
+  .btn-outline {
+    background: none;
+    color: var(--ink);
+    border: 1px solid var(--rule);
+    font-family: var(--font-body);
+    font-size: 0.75rem;
+    font-weight: 300;
+    padding: 5px 12px;
+    cursor: pointer;
+    letter-spacing: 0.06em;
+    transition: border-color 0.15s;
+  }
+  .btn-outline:hover { border-color: var(--ink); }
+
+  .freshness {
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    font-weight: 300;
+    margin-left: auto;
+  }
+  .freshness.fresh { color: var(--fresh); }
+  .freshness.stale { color: var(--accent); }
+  .freshness.unknown { color: var(--muted); }
+
+  .spinner {
+    display: none;
+    width: 16px; height: 16px;
+    border: 2px solid var(--rule);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  .spinner.active { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* FEED */
+  .feed { max-width: 720px; margin: 0 auto; padding: 0 16px 40px; }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 28px 0 0;
+    padding-bottom: 6px;
+    border-bottom: 3px solid var(--ink);
+  }
+  .section-flag {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: var(--font-head);
+    font-size: 0.68rem;
+    font-weight: 700;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    padding: 3px 8px;
+    flex-shrink: 0;
+  }
+  .section-name {
+    font-family: var(--font-head);
+    font-size: 1.05rem;
+    font-weight: 700;
+  }
+  .section-sources {
+    font-size: 0.62rem;
+    color: var(--muted);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    font-weight: 300;
+    margin-left: auto;
+  }
+
+  .story {
+    border-bottom: 1px solid var(--rule);
+    padding: 14px 0 12px;
+    animation: fadeIn 0.25s ease both;
+  }
+  @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:none; } }
+
+  .story-headline {
+    font-family: var(--font-head);
+    font-size: clamp(1rem, 3vw, 1.18rem);
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 5px;
+  }
+  .story-headline a { color: var(--ink); text-decoration: none; }
+  .story-headline a:hover { color: var(--accent); text-decoration: underline; }
+
+  .story-summary {
+    font-size: 0.92rem;
+    font-weight: 300;
+    line-height: 1.55;
+    color: #2a2218;
+    margin-bottom: 7px;
+  }
+
+  .story-footer {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .story-source {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--muted);
+    font-weight: 300;
+  }
+  .story-source a { color: var(--muted); text-decoration: none; }
+  .story-source a:hover { color: var(--accent); }
+
+  .cal-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: 1px solid var(--event);
+    color: var(--event);
+    font-family: var(--font-body);
+    font-size: 0.68rem;
+    font-weight: 400;
+    letter-spacing: 0.06em;
+    padding: 2px 8px;
+    cursor: pointer;
+    text-decoration: none;
+    transition: background 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .cal-btn:hover { background: var(--event); color: white; }
+  .cal-btn svg { width:10px; height:10px; flex-shrink:0; }
+
+  /* STATES */
+  .state-msg {
+    text-align: center;
+    padding: 60px 20px 40px;
+    color: var(--muted);
+  }
+  .state-msg .big {
+    font-family: var(--font-head);
+    font-size: 2.5rem;
+    font-weight: 700;
+    opacity: 0.15;
+    display: block;
+    margin-bottom: 14px;
+  }
+  .state-msg p { font-size: 0.9rem; font-weight: 300; line-height: 1.8; }
+  .state-msg code {
+    font-size: 0.78rem;
+    background: var(--paper-dark);
+    padding: 1px 6px;
+    border: 1px solid var(--rule);
+    font-family: 'Courier New', monospace;
+  }
+
+  .error-msg {
+    background: #f9eded;
+    border-left: 3px solid var(--accent);
+    color: var(--accent);
+    padding: 12px 16px;
+    margin: 20px 0;
+    font-size: 0.88rem;
+  }
+
+  .last-updated {
+    text-align: center;
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 24px 0 0;
+    font-weight: 300;
+  }
+
+  footer {
+    text-align: center;
+    padding: 16px;
+    border-top: 1px solid var(--rule);
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.06em;
+    font-weight: 300;
+    margin-top: 20px;
+  }
+
+  @media (max-width: 480px) {
+    .masthead { padding: 14px 12px 10px; }
+    .feed { padding: 0 12px 40px; }
+    .toolbar { padding: 8px 12px; }
+    .section-sources { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-title">LOCAL PULSE</div>
+  <div class="masthead-meta">
+    <span>Wayland · Allegan · Barry · West Michigan</span>
+    <span id="date-line"></span>
+  </div>
+</header>
+
+<div class="toolbar">
+  <button class="btn" onclick="loadNews()">↻ Refresh</button>
+  <div class="spinner" id="spinner"></div>
+  <span class="freshness unknown" id="freshness"></span>
+</div>
+
+<main class="feed" id="feed">
+  <div class="state-msg">
+    <span class="big">☰</span>
+    <p>Loading your morning digest…</p>
+  </div>
+</main>
+
+<footer>Local Pulse · Wayland, MI · RSS + Claude</footer>
+
+<script>
+const SECTIONS = [
+  { key: 'wayland',      label: 'Wayland & Surrounds',  flag: '01', sources: 'Allegan Co · Barry Co · Hastings · Wayland' },
+  { key: 'grand_rapids', label: 'Grand Rapids',          flag: '02', sources: 'MLive · WOOD TV8 · Fox17 · WZZM' },
+  { key: 'west_mi',      label: 'West Michigan',         flag: '03', sources: 'MLive · Regional' },
+  { key: 'michigan',     label: 'Michigan',              flag: '04', sources: 'Bridge MI · Michigan Radio · Freep' },
+];
+
+// Set date
+const now = new Date();
+document.getElementById('date-line').textContent = now.toLocaleDateString('en-US', {
+  weekday:'long', month:'long', day:'numeric', year:'numeric'
+});
+
+function makeCalLink(title, dateStr, location, description) {
+  const pad = n => String(n).padStart(2,'0');
+  let dtStart, dtEnd;
+  if (!dateStr) return null;
+  if (dateStr.includes('T')) {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return null;
+    const fmt = d => `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+    dtStart = fmt(d);
+    dtEnd = fmt(new Date(d.getTime() + 3600000));
+  } else {
+    dtStart = dateStr.replace(/-/g,'');
+    dtEnd = dtStart;
+  }
+  const p = new URLSearchParams({
+    action:'TEMPLATE', text: title||'Local Event',
+    dates:`${dtStart}/${dtEnd}`,
+    location: location||'Wayland, MI',
+    details: description||''
+  });
+  // Google Calendar link — on iPhone Safari this offers "Add to Apple Calendar"
+  return `https://calendar.google.com/calendar/render?${p.toString()}`;
+}
+
+function timeSince(isoStr) {
+  if (!isoStr) return null;
+  const diff = (Date.now() - new Date(isoStr)) / 60000; // minutes
+  if (diff < 60)   return { label: `Updated ${Math.round(diff)}m ago`, cls: 'fresh' };
+  if (diff < 180)  return { label: `Updated ${Math.round(diff/60)}h ago`, cls: 'fresh' };
+  if (diff < 1440) return { label: `Updated ${Math.round(diff/60)}h ago`, cls: 'stale' };
+  return { label: `Updated ${Math.round(diff/1440)}d ago`, cls: 'stale' };
+}
+
+function renderFeed(data) {
+  const feed = document.getElementById('feed');
+  const freshEl = document.getElementById('freshness');
+
+  // Freshness indicator
+  const ts = timeSince(data.fetched_at);
+  if (ts) {
+    freshEl.textContent = ts.label;
+    freshEl.className = `freshness ${ts.cls}`;
+  }
+
+  if (data.error) {
+    feed.innerHTML = `<div class="error-msg"><strong>Fetch error:</strong> ${data.error}</div>`;
+    return;
+  }
+
+  let html = '';
+  let hasAny = false;
+
+  for (const sec of SECTIONS) {
+    const stories = data[sec.key];
+    if (!stories || stories.length === 0) continue;
+    hasAny = true;
+
+    html += `<div class="section-header">
+      <span class="section-flag">${sec.flag}</span>
+      <span class="section-name">${sec.label}</span>
+      <span class="section-sources">${sec.sources}</span>
+    </div>`;
+
+    stories.forEach((s, i) => {
+      const calLink = s.event_date ? makeCalLink(s.headline, s.event_date, s.event_location, s.summary) : null;
+      const calBtn = calLink ? `<a class="cal-btn" href="${calLink}" target="_blank" rel="noopener">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+          <rect x="1" y="3" width="14" height="12" rx="1.5"/>
+          <path d="M5 1v4M11 1v4M1 7h14"/>
+        </svg>Add to Calendar</a>` : '';
+
+      const srcHtml = s.source_url
+        ? `<span class="story-source"><a href="${s.source_url}" target="_blank" rel="noopener">${s.source_name||'Read more'} →</a></span>`
+        : s.source_name ? `<span class="story-source">${s.source_name}</span>` : '';
+
+      const headline = s.source_url
+        ? `<a href="${s.source_url}" target="_blank" rel="noopener">${s.headline}</a>`
+        : s.headline;
+
+      html += `<div class="story" style="animation-delay:${i*0.04}s">
+        <div class="story-headline">${headline}</div>
+        <div class="story-summary">${s.summary}</div>
+        <div class="story-footer">${srcHtml}${calBtn}</div>
+      </div>`;
+    });
+  }
+
+  if (!hasAny) {
+    html = `<div class="state-msg"><span class="big">∅</span>
+      <p>No stories in today's digest.<br>The fetch may still be running or sources were unavailable.</p></div>`;
+  } else {
+    const localTime = new Date(data.fetched_at).toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
+    html += `<div class="last-updated">Fetched at ${localTime} · RSS + Claude Haiku</div>`;
+  }
+
+  feed.innerHTML = html;
+}
+
+async function loadNews() {
+  const feed = document.getElementById('feed');
+  const spinner = document.getElementById('spinner');
+  const freshEl = document.getElementById('freshness');
+
+  spinner.classList.add('active');
+  freshEl.textContent = 'Loading…';
+  freshEl.className = 'freshness unknown';
+
+  try {
+    // Load news.json from same directory as this HTML file
+    const resp = await fetch('news.json?t=' + Date.now());
+
+    if (!resp.ok) {
+      if (resp.status === 404) {
+        feed.innerHTML = `<div class="state-msg">
+          <span class="big">◌</span>
+          <p>No news data yet.<br><br>
+          Run the fetch script first:<br>
+          <code>python fetch_news.py</code><br><br>
+          Or wait for the 7am Task Scheduler run.</p>
+        </div>`;
+      } else {
+        throw new Error(`HTTP ${resp.status}`);
+      }
+      return;
+    }
+
+    const data = await resp.json();
+    renderFeed(data);
+
+  } catch(err) {
+    // If opening as a local file (file://) fetch won't work without a server.
+    // Show helpful message.
+    if (window.location.protocol === 'file:') {
+      feed.innerHTML = `<div class="state-msg">
+        <span class="big">⚠</span>
+        <p>To view news, open this file via a local web server:<br><br>
+        <code>python -m http.server 8765 --directory C:\\LocalPulse</code><br><br>
+        Then visit: <strong>http://localhost:8765</strong><br><br>
+        The morning script does this automatically.</p>
+      </div>`;
+    } else {
+      feed.innerHTML = `<div class="error-msg"><strong>Could not load news.json:</strong> ${err.message}</div>`;
+    }
+    console.error(err);
+  } finally {
+    spinner.classList.remove('active');
+  }
+}
+
+// Load on page open
+loadNews();
+</script>
+</body>
+</html>

@@ -1,0 +1,25 @@
+services:
+  localpulse:
+    build: .
+    container_name: localpulse
+    restart: unless-stopped
+    ports:
+      - "8765:8765"
+    environment:
+      # Your Anthropic API key
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # ntfy topic for phone notifications (your existing topic)
+      - NTFY_TOPIC=Wayland_Pulse_Havens_24
+      # Your homelab server's local IP — used in the ntfy click URL
+      - SERVER_IP=192.168.4.45
+      # Cron schedule (default: 7am daily). Uses standard cron syntax.
+      # Examples:  0 7 * * *   = 7:00am daily
+      #            30 6 * * *  = 6:30am daily
+      - TZ=America/Detroit
+      - FETCH_CRON=0 7 * * *
+    volumes:
+      # Persistent storage for news.json, fetch.log, cron.log
+      - localpulse_data:/app/data
+
+volumes:
+  localpulse_data:
